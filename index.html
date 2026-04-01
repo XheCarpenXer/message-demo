@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DLDSS Messenger — P2P</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:   #ffffff;
+      --bg-secondary: #f5f5f4;
+      --bg-tertiary:  #eeece8;
+      --text-primary:   #1a1a18;
+      --text-secondary: #5f5e5a;
+      --text-tertiary:  #8a8a85;
+      --border-light: rgba(0,0,0,0.09);
+      --border-mid:   rgba(0,0,0,0.17);
+      --accent:      #185FA5;
+      --accent-dark: #0C447C;
+      --accent-bg:   #E6F1FB;
+      --success:     #1D9E75;
+      --warn:        #BA7517;
+      --danger:      #A32D2D;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --font: 'Söhne', 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'DM Mono', 'Fira Mono', monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary:   #1c1c1a;
+        --bg-secondary: #252523;
+        --bg-tertiary:  #2e2e2b;
+        --text-primary:   #f0efe9;
+        --text-secondary: #b4b2a9;
+        --text-tertiary:  #888780;
+        --border-light: rgba(255,255,255,0.07);
+        --border-mid:   rgba(255,255,255,0.14);
+        --accent:      #378ADD;
+        --accent-dark: #85B7EB;
+        --accent-bg:   #0C2D4A;
+        --success:     #5DCAA5;
+        --warn:        #EF9F27;
+        --danger:      #F09595;
+      }
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-tertiary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    #app-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+      font-weight: 500;
+      align-self: flex-start;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    #app {
+      display: flex;
+      width: 100%;
+      max-width: 900px;
+      height: 640px;
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--bg-primary);
+      box-shadow: 0 2px 24px rgba(0,0,0,0.07);
+    }
+
+    /* ═══════════════ SIDEBAR ═══════════════ */
+    #sidebar {
+      width: 220px;
+      min-width: 220px;
+      border-right: 0.5px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+    }
+
+    #sidebar-top {
+      padding: 12px 12px 10px;
+      border-bottom: 0.5px solid var(--border-light);
+    }
+
+    #identity-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 8px;
+    }
+
+    #my-avatar {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    #my-name {
+      font-size: 13px; font-weight: 500;
+      color: var(--text-primary);
+      flex: 1; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+
+    #change-user {
+      font-size: 10px; color: var(--text-tertiary);
+      cursor: pointer; background: none; border: none;
+      padding: 2px 5px; border-radius: 4px;
+      font-family: var(--font);
+    }
+    #change-user:hover { color: var(--text-secondary); background: var(--bg-primary); }
+
+    /* P2P status pill */
+    #p2p-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 8px;
+      border-radius: var(--radius-md);
+      border: 0.5px solid var(--border-mid);
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    #p2p-pill:hover { background: var(--bg-tertiary); }
+
+    .p2p-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-tertiary);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .p2p-dot.connected { background: var(--success); animation: pulse 2s infinite; }
+    .p2p-dot.connecting { background: var(--warn); animation: pulse 0.8s infinite; }
+    .p2p-dot.error { background: var(--danger); }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    #p2p-label {
+      font-size: 11px; color: var(--text-secondary);
+      flex: 1;
+    }
+
+    #peer-count {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      background: var(--bg-secondary);
+      padding: 1px 5px; border-radius: 8px;
+    }
+
+    #channel-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+
+    .section-label {
+      font-size: 10px; color: var(--text-tertiary);
+      padding: 8px 12px 2px;
+      letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500;
+    }
+
+    .channel-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 12px; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .channel-item:hover { background: var(--bg-primary); }
+    .channel-item.active { background: var(--bg-primary); }
+
+    .ch-icon { font-size: 11px; color: var(--text-tertiary); width: 14px; text-align: center; flex-shrink: 0; }
+    .ch-name { font-size: 13px; color: var(--text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .channel-item.active .ch-name { color: var(--text-primary); font-weight: 500; }
+
+    .unread-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+
+    #new-ch-btn {
+      margin: 6px 12px 10px;
+      padding: 5px 10px;
+      font-size: 11px;
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-md);
+      background: none; color: var(--text-tertiary);
+      cursor: pointer; font-family: var(--font);
+      width: calc(100% - 24px); text-align: left;
+    }
+    #new-ch-btn:hover { color: var(--text-primary); background: var(--bg-primary); }
+
+    .sidebar-footer {
+      padding: 6px 12px 10px;
+      border-top: 0.5px solid var(--border-light);
+      font-size: 10px; color: var(--text-tertiary);
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    /* ═══════════════ MAIN ═══════════════ */
+    #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    #chat-header {
+      padding: 11px 16px;
+      border-bottom: 0.5px solid var(--border-light);
+      display: flex; align-items: center; gap: 10px;
+      display: none;
+    }
+
+    #chat-title { font-size: 14px; font-weight: 500; color: var(--text-primary); flex: 1; }
+
+    #dag-counter {
+      font-size: 10px; color: var(--text-tertiary);
+      font-family: var(--font-mono);
+    }
+
+    #messages {
+      flex: 1; overflow-y: auto;
+      padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 1px;
+    }
+
+    #empty-state {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--text-tertiary); gap: 5px;
+    }
+    #empty-state p { font-size: 13px; }
+    #empty-state .sub { font-size: 11px; }
+
+    .msg-group { display: flex; flex-direction: column; margin-bottom: 8px; }
+
+    .msg-sender-row {
+      display: flex; align-items: center; gap: 5px; margin-bottom: 2px;
+    }
+
+    .msg-avatar {
+      width: 20px; height: 20px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 600; flex-shrink: 0;
+    }
+
+    .msg-sender-name { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+    .msg-time { font-size: 10px; color: var(--text-tertiary); }
+
+    /* Origin badge — shows where the event came from */
+    .msg-origin {
+      font-size: 9px;
+      padding: 1px 4px; border-radius: 3px;
+      font-family: var(--font-mono);
+      margin-left: 2px;
+    }
+    .msg-origin.local  { background: var(--accent-bg); color: var(--accent); }
+    .msg-origin.bc     { background: #EAF3DE; color: #3B6D11; }
+    .msg-origin.p2p    { background: #FAEEDA; color: #633806; }
+
+    @media (prefers-color-scheme: dark) {
+      .msg-origin.bc  { background: #1a3010; color: #97C459; }
+      .msg-origin.p2p { background: #2e1e04; color: #EF9F27; }
+    }
+
+    .msg-bubble {
+      margin-left: 25px;
+      padding: 6px 10px;
+      border-radius: 2px 9px 9px 9px;
+      font-size: 13px; line-height: 1.45;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border: 0.5px solid var(--border-light);
+      max-width: 460px; width: fit-content;
+      word-break: break-word;
+    }
+
+    .msg-bubble.own {
+      margin-left: auto; margin-right: 0;
+      border-radius: 9px 2px 9px 9px;
+      background: var(--accent);
+      color: #fff; border: none;
+    }
+
+    .msg-group.own .msg-sender-row { justify-content: flex-end; }
+    .msg-group.own .msg-sender-name { order: 2; }
+    .msg-group.own .msg-avatar { order: 3; }
+    .msg-group.own .msg-time { order: 1; }
+    .msg-group.own .msg-origin { order: 0; }
+
+    #input-area {
+      border-top: 0.5px solid var(--border-light);
+      padding: 9px 12px;
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+
+    #msg-input {
+      flex: 1; resize: none;
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-md);
+      padding: 7px 10px;
+      font-size: 13px; font-family: var(--font);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 36px; max-height: 90px; line-height: 1.4;
+      outline: none;
+    }
+    #msg-input:focus { border-color: var(--accent); }
+    #msg-input::placeholder { color: var(--text-tertiary); }
+
+    #send-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: #fff; font-size: 14px;
+      transition: background 0.1s, transform 0.1s;
+    }
+    #send-btn:hover { background: var(--accent-dark); }
+    #send-btn:active { transform: scale(0.92); }
+
+    #sync-bar {
+      font-size: 10px; color: var(--text-tertiary);
+      padding: 3px 12px;
+      border-top: 0.5px solid var(--border-light);
+      background: var(--bg-secondary);
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono);
+    }
+
+    .sync-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--success); display: inline-block;
+      animation: pulse 2s infinite;
+    }
+
+    /* ═══════════════ P2P PANEL ═══════════════ */
+    #p2p-panel {
+      width: 280px;
+      min-width: 280px;
+      border-left: 0.5px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+      display: none;
+    }
+    #p2p-panel.open { display: flex; }
+
+    #p2p-header {
+      padding: 12px 14px;
+      border-bottom: 0.5px solid var(--border-light);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    #p2p-header h3 { font-size: 13px; font-weight: 500; color: var(--text-primary); flex: 1; }
+
+    #p2p-close {
+      font-size: 16px; color: var(--text-tertiary);
+      cursor: pointer; background: none; border: none;
+      line-height: 1; padding: 0 2px; font-family: var(--font);
+    }
+    #p2p-close:hover { color: var(--text-primary); }
+
+    #p2p-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+
+    .p2p-section { display: flex; flex-direction: column; gap: 6px; }
+
+    .p2p-section h4 {
+      font-size: 10px; font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .p2p-section p {
+      font-size: 11px; color: var(--text-secondary); line-height: 1.5;
+    }
+
+    .p2p-section textarea, .p2p-section input {
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-md);
+      padding: 7px 9px;
+      color: var(--text-primary);
+      outline: none;
+      resize: none;
+      line-height: 1.4;
+    }
+    .p2p-section textarea:focus, .p2p-section input:focus { border-color: var(--accent); }
+
+    .btn-row { display: flex; gap: 6px; }
+
+    .p2p-btn {
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      font-size: 11px; font-family: var(--font);
+      cursor: pointer; border: 0.5px solid var(--border-mid);
+      background: var(--bg-primary); color: var(--text-secondary);
+      flex: 1;
+    }
+    .p2p-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .p2p-btn.primary { background: var(--accent); color: #fff; border: none; }
+    .p2p-btn.primary:hover { background: var(--accent-dark); }
+    .p2p-btn.danger { border-color: var(--danger); color: var(--danger); }
+    .p2p-btn.danger:hover { background: #FCEBEB; }
+
+    @media (prefers-color-scheme: dark) {
+      .p2p-btn.danger:hover { background: #300; }
+    }
+
+    #peer-list { display: flex; flex-direction: column; gap: 4px; }
+
+    .peer-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border-light);
+    }
+
+    .peer-status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0;
+    }
+
+    .peer-name { font-size: 11px; color: var(--text-primary); flex: 1; }
+    .peer-events { font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+    .peer-disconnect {
+      font-size: 10px; color: var(--text-tertiary);
+      cursor: pointer; background: none; border: none;
+      padding: 2px 4px; border-radius: 3px; font-family: var(--font);
+    }
+    .peer-disconnect:hover { color: var(--danger); background: var(--bg-secondary); }
+
+    #p2p-log {
+      flex: none;
+      border-top: 0.5px solid var(--border-light);
+      padding: 8px 14px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-tertiary);
+      max-height: 120px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .log-line { line-height: 1.5; }
+    .log-line.info  { color: var(--text-tertiary); }
+    .log-line.ok    { color: var(--success); }
+    .log-line.warn  { color: var(--warn); }
+    .log-line.error { color: var(--danger); }
+
+    /* ═══════════════ MODAL ═══════════════ */
+    #modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+
+    #modal {
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      width: 300px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+    }
+
+    #modal h3 { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 12px; }
+
+    #modal input, #modal select {
+      width: 100%;
+      border: 0.5px solid var(--border-mid);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-size: 13px; font-family: var(--font);
+      margin-bottom: 8px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      outline: none; display: block;
+    }
+    #modal input:focus, #modal select:focus { border-color: var(--accent); }
+
+    .modal-btns { display: flex; gap: 8px; margin-top: 6px; }
+    .modal-btns button {
+      flex: 1; padding: 8px; border-radius: var(--radius-md);
+      font-size: 12px; cursor: pointer; font-family: var(--font);
+    }
+    .btn-primary-modal { background: var(--accent); color: #fff; border: none; }
+    .btn-primary-modal:hover { background: var(--accent-dark); }
+    .btn-cancel { background: none; border: 0.5px solid var(--border-mid); color: var(--text-secondary); }
+    .btn-cancel:hover { background: var(--bg-secondary); }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div id="app-label">DLDSS Messenger · P2P Edition — Deterministic Local DAG State System v1.1</div>
+
+<div id="app">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+    <div id="sidebar-top">
+      <div id="identity-row">
+        <div id="my-avatar"></div>
+        <span id="my-name"></span>
+        <button id="change-user">switch</button>
+      </div>
+      <div id="p2p-pill" title="Open P2P panel">
+        <span class="p2p-dot" id="p2p-dot"></span>
+        <span id="p2p-label">P2P offline</span>
+        <span id="peer-count">0 peers</span>
+      </div>
+    </div>
+    <div id="channel-list"></div>
+    <button id="new-ch-btn">+ new channel</button>
+    <div class="sidebar-footer">
+      <span class="sync-dot" style="width:5px;height:5px;display:inline-block;border-radius:50%;background:var(--success);animation:pulse 2s infinite;flex-shrink:0;"></span>
+      DAG · localStorage · BroadcastChannel
+    </div>
+  </div>
+
+  <!-- ── Main chat ── -->
+  <div id="main">
+    <div id="chat-header">
+      <span id="chat-title"></span>
+      <span id="dag-counter"></span>
+    </div>
+    <div id="messages">
+      <div id="empty-state">
+        <p>Select a channel to start messaging</p>
+        <p class="sub">Open multiple tabs or connect P2P peers to sync across devices</p>
+      </div>
+    </div>
+    <div id="input-area">
+      <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
+      <button id="send-btn">&#10148;</button>
+    </div>
+    <div id="sync-bar">
+      <span class="sync-dot"></span>
+      <span id="sync-status">dag: 0 events · 0 peers · bc active</span>
+    </div>
+  </div>
+
+  <!-- ── P2P Panel ── -->
+  <div id="p2p-panel">
+    <div id="p2p-header">
+      <h3>P2P Connect</h3>
+      <button id="p2p-close">&#215;</button>
+    </div>
+
+    <div id="p2p-body">
+
+      <!-- Step 1: Create offer -->
+      <div class="p2p-section">
+        <h4>1 · Create offer (you initiate)</h4>
+        <p>Generate an offer, send it to the other device out-of-band (text, email, etc.).</p>
+        <div class="btn-row">
+          <button class="p2p-btn primary" id="create-offer-btn">Generate offer</button>
+          <button class="p2p-btn" id="copy-offer-btn" style="display:none">Copy offer</button>
+        </div>
+        <textarea id="offer-output" rows="4" placeholder="Offer SDP will appear here..." readonly></textarea>
+      </div>
+
+      <!-- Step 2: Paste answer (initiator) -->
+      <div class="p2p-section">
+        <h4>2a · Paste answer here (if you initiated)</h4>
+        <textarea id="answer-input" rows="4" placeholder="Paste answer SDP from other device..."></textarea>
+        <button class="p2p-btn primary" id="accept-answer-btn">Accept answer</button>
+      </div>
+
+      <!-- Step 2: Accept offer (responder) -->
+      <div class="p2p-section">
+        <h4>2b · Accept offer (other device initiated)</h4>
+        <p>Paste the offer, generate an answer, send the answer back.</p>
+        <textarea id="offer-input" rows="4" placeholder="Paste offer SDP from other device..."></textarea>
+        <div class="btn-row">
+          <button class="p2p-btn primary" id="accept-offer-btn">Generate answer</button>
+          <button class="p2p-btn" id="copy-answer-btn" style="display:none">Copy answer</button>
+        </div>
+        <textarea id="answer-output" rows="4" placeholder="Answer SDP will appear here..." readonly></textarea>
+      </div>
+
+      <!-- Connected peers -->
+      <div class="p2p-section">
+        <h4>Connected peers</h4>
+        <div id="peer-list">
+          <p style="font-size:11px;color:var(--text-tertiary)">No peers connected</p>
+        </div>
+      </div>
+
+      <!-- Sync existing DAG -->
+      <div class="p2p-section">
+        <h4>Sync</h4>
+        <p>Push your full DAG to all connected peers.</p>
+        <button class="p2p-btn" id="sync-dag-btn">Push full DAG to peers</button>
+      </div>
+
+    </div>
+
+    <div id="p2p-log"></div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="modal-cancel">cancel</button>
+      <button class="btn-primary-modal" id="modal-confirm">confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+ * ════════════════════════════════════════════════════════════
+ *  DLDSS Messenger — P2P Edition
+ *  Deterministic Local DAG State System v1.1
+ *
+ *  Architecture:
+ *   ┌─────────────────────────────────────────────┐
+ *   │  UI Layer (derived entirely from DAG replay) │
+ *   └────────────────────┬────────────────────────┘
+ *                        │ read
+ *   ┌────────────────────▼────────────────────────┐
+ *   │  DAG Core (append-only, deterministic)       │
+ *   │  state = reduce(events)                      │
+ *   └──┬─────────────┬──────────────┬─────────────┘
+ *      │ write       │ write        │ write
+ *   ┌──▼──┐     ┌────▼───────┐  ┌──▼──────────────┐
+ *   │ LS  │     │Broadcast   │  │ P2P Transport    │
+ *   │store│     │Channel     │  │ (WebRTC DC)      │
+ *   └─────┘     │(same tab)  │  │ cross-device     │
+ *               └────────────┘  └─────────────────┘
+ *
+ *  P2P Integration Rules (per DLDSS spec):
+ *   • DAG class is UNCHANGED
+ *   • P2P is purely transport — no DAG logic inside it
+ *   • Incoming peer events hit the same receiveEvent() path
+ *   • Deduplication via seen-Set keyed on eventId
+ *   • Deterministic merge: sort by [timestamp, authorId]
+ *   • Signaling: manual copy/paste (serverless, no STUN needed on LAN)
+ * ════════════════════════════════════════════════════════════
+ */
+
+// ── Constants ─────────────────────────────────────────────
+const DAG_KEY       = 'dldss_p2p_dag';
+const USER_KEY      = 'dldss_p2p_user';
+const BC_NAME       = 'dldss-p2p-messenger';
+const ICE_SERVERS   = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+
+// ── Users ─────────────────────────────────────────────────
+const USERS = [
+  { id: 'alice', name: 'Alice', color: '#185FA5', bg: '#E6F1FB' },
+  { id: 'bob',   name: 'Bob',   color: '#0F6E56', bg: '#E1F5EE' },
+  { id: 'carol', name: 'Carol', color: '#993C1D', bg: '#FAECE7' },
+  { id: 'dan',   name: 'Dan',   color: '#993556', bg: '#FBEAF0' },
+];
+
+const SEED_CHANNELS = [
+  { id: 'general', name: 'general', type: 'group' },
+  { id: 'random',  name: 'random',  type: 'group' },
+];
+
+const AV_COLORS = ['#185FA5','#0F6E56','#993C1D','#993556','#534AB7','#3B6D11','#BA7517'];
+const AV_BGS    = ['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#EEEDFE','#EAF3DE','#FAEEDA'];
+
+
+// ════════════════════════════════════════════════════════════
+//  DAG CORE — UNCHANGED from DLDSS v1.0
+// ════════════════════════════════════════════════════════════
+class DAG {
+  constructor() { this.events = []; }
+
+  append(event) { this.events.push(event); }
+
+  getAll()         { return this.events; }
+
+  getByChannel(ch) {
+    return this.events.filter(e => e.type === 'message' && e.payload.channel === ch);
+  }
+
+  getChannels() {
+    const map = {};
+    this.events.filter(e => e.type === 'create_channel')
+               .forEach(e => { map[e.payload.id] = e.payload; });
+    return Object.values(map);
+  }
+
+  /**
+   * Deterministic merge: sort all events by [timestamp, author].
+   * Called after a bulk DAG sync from a peer to re-establish order.
+   */
+  sort() {
+    this.events.sort((a, b) =>
+      a.timestamp !== b.timestamp
+        ? a.timestamp - b.timestamp
+        : (a.author || '').localeCompare(b.author || '')
+    );
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  PERSISTENCE LAYER — localStorage
+// ════════════════════════════════════════════════════════════
+function loadDAG(dag) {
+  try {
+    const raw = localStorage.getItem(DAG_KEY);
+    if (raw) JSON.parse(raw).forEach(e => dag.append(e));
+  } catch (err) { p2pLog('warn', 'DAG load failed: ' + err.message); }
+}
+
+function saveDAG(dag) {
+  try { localStorage.setItem(DAG_KEY, JSON.stringify(dag.getAll())); }
+  catch (err) { p2pLog('warn', 'DAG save failed: ' + err.message); }
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  EVENT SYSTEM — single write path
+// ════════════════════════════════════════════════════════════
+
+/** Unique event ID: timestamp + author + random suffix */
+function makeEventId(author) {
+  return `${Date.now()}-${author}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function createEvent(type, payload, author) {
+  return { id: makeEventId(author), type, payload, author, timestamp: Date.now() };
+}
+
+/**
+ * The single write path for all local events.
+ * 1. Append to DAG
+ * 2. Persist to localStorage
+ * 3. Broadcast to same-device tabs via BroadcastChannel
+ * 4. Broadcast to cross-device peers via WebRTC DataChannels   ← NEW
+ */
+function dispatchEvent(event) {
+  if (seenEvent(event.id)) return;            // deduplicate
+  markSeen(event.id);
+  dag.append(event);
+  saveDAG(dag);
+  bc.postMessage({ event, origin: 'local' }); // same-device tabs
+  p2pBroadcast(event);                        // cross-device peers
+}
+
+/**
+ * Receive path for events arriving from ANY external source
+ * (BroadcastChannel or WebRTC peer). Identical to local dispatch
+ * minus the broadcast-back to the same source.
+ */
+function receiveEvent(event, originLabel, skipPeerBroadcast) {
+  if (seenEvent(event.id)) return;
+  markSeen(event.id);
+  dag.append(event);
+  saveDAG(dag);
+  // Relay to peers so they also receive events from BroadcastChannel
+  if (!skipPeerBroadcast) p2pBroadcast(event);
+  handleIncoming(event, originLabel);
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  DEDUPLICATION — seen Set keyed on event ID
+// ════════════════════════════════════════════════════════════
+const seen = new Set();
+
+function seenEvent(id) { return seen.has(id); }
+function markSeen(id)  { seen.add(id); }
+
+/** Pre-populate seen Set from loaded DAG so replays don't re-process */
+function seedSeen(dag) {
+  dag.getAll().forEach(e => { if (e.id) seen.add(e.id); });
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  SAME-DEVICE SYNC — BroadcastChannel (unchanged from v1.0)
+// ════════════════════════════════════════════════════════════
+const bc = new BroadcastChannel(BC_NAME);
+
+bc.onmessage = (msg) => {
+  const { event, origin } = msg.data || {};
+  if (!event) return;
+  receiveEvent(event, 'bc', true); // don't relay back through P2P to avoid loops
+  renderAll();
+};
+
+
+// ════════════════════════════════════════════════════════════
+//  P2P TRANSPORT LAYER — WebRTC DataChannel
+//
+//  Each RTCPeerConnection gets a DataChannel called 'dag-sync'.
+//  Messages are JSON-encoded and one of three types:
+//    { type: 'event',    event: {...} }        — single new event
+//    { type: 'dag-sync', events: [...] }       — full DAG push
+//    { type: 'dag-req' }                       — request full DAG
+//
+//  Signaling is manual (serverless) — offer/answer SDP strings
+//  are copied out-of-band. Works on any network including LAN
+//  with no TURN server requirement.
+// ════════════════════════════════════════════════════════════
+
+const peers = {};            // { peerId: { pc, dc, name, eventsReceived } }
+let peerIdCounter = 0;
+
+/** Broadcast a single event to all connected peers */
+function p2pBroadcast(event) {
+  const msg = JSON.stringify({ type: 'event', event });
+  Object.values(peers).forEach(({ dc }) => {
+    if (dc && dc.readyState === 'open') {
+      try { dc.send(msg); } catch(e) {}
+    }
+  });
+}
+
+/** Push our full DAG to all connected peers */
+function p2pSyncAll() {
+  const msg = JSON.stringify({ type: 'dag-sync', events: dag.getAll() });
+  let pushed = 0;
+  Object.values(peers).forEach(({ dc }) => {
+    if (dc && dc.readyState === 'open') {
+      try { dc.send(msg); pushed++; } catch(e) {}
+    }
+  });
+  p2pLog('ok', `DAG pushed to ${pushed} peer(s) — ${dag.getAll().length} events`);
+}
+
+/** Handle a message arriving on a DataChannel */
+function onP2PMessage(raw, peerId) {
+  let msg;
+  try { msg = JSON.parse(raw); } catch(e) { return; }
+
+  peers[peerId] && (peers[peerId].eventsReceived = (peers[peerId].eventsReceived || 0) + 1);
+
+  if (msg.type === 'event') {
+    receiveEvent(msg.event, 'p2p');
+    renderAll();
+  }
+  else if (msg.type === 'dag-sync') {
+    let added = 0;
+    (msg.events || []).forEach(e => {
+      if (!seenEvent(e.id || '')) { receiveEvent(e, 'p2p'); added++; }
+    });
+    dag.sort();
+    saveDAG(dag);
+    p2pLog('ok', `Received DAG sync: ${added} new events`);
+    renderAll();
+  }
+  else if (msg.type === 'dag-req') {
+    // Peer is asking for our DAG
+    const { dc } = peers[peerId] || {};
+    if (dc && dc.readyState === 'open') {
+      dc.send(JSON.stringify({ type: 'dag-sync', events: dag.getAll() }));
+    }
+  }
+}
+
+/** Set up a DataChannel and its event listeners */
+function setupDataChannel(dc, peerId, label) {
+  dc.onopen = () => {
+    p2pLog('ok', `DataChannel open with ${label}`);
+    // On connect, request the peer's full DAG
+    setTimeout(() => {
+      try { dc.send(JSON.stringify({ type: 'dag-req' })); } catch(e) {}
+    }, 200);
+    updateP2PUI();
+  };
+
+  dc.onclose = () => {
+    p2pLog('warn', `DataChannel closed: ${label}`);
+    delete peers[peerId];
+    updateP2PUI();
+  };
+
+  dc.onerror = (e) => {
+    p2pLog('error', `DataChannel error: ${e.message || 'unknown'}`);
+  };
+
+  dc.onmessage = (e) => onP2PMessage(e.data, peerId);
+}
+
+/** Create a PeerConnection and add it to the peers map */
+function createPeerConnection(label) {
+  const peerId = 'peer_' + (++peerIdCounter);
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+  peers[peerId] = { pc, dc: null, name: label, eventsReceived: 0 };
+
+  pc.oniceconnectionstatechange = () => {
+    p2pLog('info', `ICE state (${label}): ${pc.iceConnectionState}`);
+    if (['failed','disconnected','closed'].includes(pc.iceConnectionState)) {
+      delete peers[peerId];
+      updateP2PUI();
+    }
+  };
+
+  pc.onicecandidate = (e) => {
+    // ICE candidates are bundled into the SDP via trickle-ice delay
+  };
+
+  return { peerId, pc };
+}
+
+/** INITIATOR: create offer */
+async function createOffer() {
+  p2pLog('info', 'Creating offer...');
+  const { peerId, pc } = createPeerConnection('remote-' + peerIdCounter);
+
+  const dc = pc.createDataChannel('dag-sync');
+  peers[peerId].dc = dc;
+  setupDataChannel(dc, peerId, peers[peerId].name);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  // Wait for ICE gathering to complete (collect all candidates)
+  await waitForICE(pc);
+
+  const sdp = JSON.stringify(pc.localDescription);
+  document.getElementById('offer-output').value = sdp;
+  document.getElementById('copy-offer-btn').style.display = '';
+
+  // Store peerId on the pc so we can accept the answer later
+  pc._dldssId = peerId;
+  window._pendingPc = pc;
+
+  p2pLog('ok', 'Offer created — copy and send to peer');
+  updateP2PUI();
+}
+
+/** INITIATOR: accept answer from responder */
+async function acceptAnswer() {
+  const raw = document.getElementById('answer-input').value.trim();
+  if (!raw || !window._pendingPc) {
+    p2pLog('error', 'No pending offer or answer is empty');
+    return;
+  }
+  try {
+    const answer = JSON.parse(raw);
+    await window._pendingPc.setRemoteDescription(answer);
+    p2pLog('ok', 'Answer accepted — waiting for connection...');
+    document.getElementById('answer-input').value = '';
+  } catch(e) {
+    p2pLog('error', 'Invalid answer SDP: ' + e.message);
+  }
+}
+
+/** RESPONDER: accept offer and generate answer */
+async function acceptOffer() {
+  const raw = document.getElementById('offer-input').value.trim();
+  if (!raw) { p2pLog('error', 'Offer is empty'); return; }
+
+  try {
+    const offer = JSON.parse(raw);
+    const { peerId, pc } = createPeerConnection('initiator-' + peerIdCounter);
+
+    // Responder receives DataChannel from initiator
+    pc.ondatachannel = (e) => {
+      peers[peerId].dc = e.channel;
+      setupDataChannel(e.channel, peerId, peers[peerId].name);
+    };
+
+    await pc.setRemoteDescription(offer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    await waitForICE(pc);
+
+    const sdp = JSON.stringify(pc.localDescription);
+    document.getElementById('answer-output').value = sdp;
+    document.getElementById('copy-answer-btn').style.display = '';
+
+    p2pLog('ok', 'Answer generated — copy and send back to initiator');
+    document.getElementById('offer-input').value = '';
+  } catch(e) {
+    p2pLog('error', 'Failed to accept offer: ' + e.message);
+  }
+}
+
+/** Wait for ICE gathering to complete with a timeout */
+function waitForICE(pc) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === 'complete') { resolve(); return; }
+    const timer = setTimeout(resolve, 4000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') {
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+  });
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  APP STATE
+// ════════════════════════════════════════════════════════════
+const dag = new DAG();
+let currentUser   = null;
+let activeChannel = null;
+let unread        = {};
+let modalResolve  = null;
+const colorCache  = {};
+
+
+// ════════════════════════════════════════════════════════════
+//  RENDER — UI derived from DAG replay
+// ════════════════════════════════════════════════════════════
+function renderAll() {
+  renderChannelList();
+  if (activeChannel) renderMessages();
+  updateSyncBar();
+}
+
+function renderUserRow() {
+  const u = USERS.find(u => u.id === currentUser);
+  const av = document.getElementById('my-avatar');
+  av.textContent = u.name[0];
+  av.style.background = u.bg;
+  av.style.color = u.color;
+  document.getElementById('my-name').textContent = u.name;
+}
+
+function renderChannelList() {
+  const dagChs = dag.getChannels();
+  const all = [...SEED_CHANNELS];
+  dagChs.forEach(c => { if (!all.find(x => x.id === c.id)) all.push(c); });
+
+  const groups = all.filter(c => c.type !== 'dm');
+  const dms    = all.filter(c => c.type === 'dm');
+
+  const list = document.getElementById('channel-list');
+  list.innerHTML = '';
+
+  const renderSection = (label, chs) => {
+    if (!chs.length) return;
+    const hdr = document.createElement('div');
+    hdr.className = 'section-label';
+    hdr.textContent = label;
+    list.appendChild(hdr);
+
+    chs.forEach(ch => {
+      const item = document.createElement('div');
+      item.className = 'channel-item' + (activeChannel === ch.id ? ' active' : '');
+      const u = unread[ch.id] || 0;
+      item.innerHTML = `
+        <span class="ch-icon">${ch.type === 'dm' ? '&#9679;' : '#'}</span>
+        <span class="ch-name">${esc(ch.name)}</span>
+        ${u > 0 ? `<span class="unread-dot"></span>` : ''}
+      `;
+      item.onclick = () => openChannel(ch.id, ch.name, ch.type);
+      list.appendChild(item);
+    });
+  };
+
+  renderSection('Channels', groups);
+  renderSection('Direct Messages', dms);
+}
+
+function renderMessages() {
+  const msgs = dag.getByChannel(activeChannel);
+  const container = document.getElementById('messages');
+
+  document.getElementById('dag-counter').textContent =
+    `${dag.getAll().length} events`;
+
+  if (!msgs.length) {
+    container.innerHTML = '<div id="empty-state"><p>No messages yet — say hi!</p></div>';
+    return;
+  }
+
+  let html = '';
+  let lastAuthor = null, lastTime = null, openGroup = false;
+
+  msgs.forEach(m => {
+    const u    = USERS.find(u => u.id === m.payload.author);
+    const name = u ? u.name : m.payload.author;
+    const isOwn = m.payload.author === currentUser;
+    const uc    = u || getColor(m.payload.author);
+    const newGroup = m.payload.author !== lastAuthor || (m.timestamp - lastTime) > 300000;
+
+    lastAuthor = m.payload.author;
+    lastTime   = m.timestamp;
+
+    if (newGroup) {
+      if (openGroup) html += '</div>';
+      const origin = m._origin || 'local';
+      html += `
+        <div class="msg-group${isOwn ? ' own' : ''}">
+          <div class="msg-sender-row">
+            <div class="msg-avatar" style="background:${uc.bg};color:${uc.color}">${name[0]}</div>
+            <span class="msg-sender-name">${isOwn ? 'you' : esc(name)}</span>
+            <span class="msg-time">${fmtTime(m.timestamp)}</span>
+            <span class="msg-origin ${origin}">${origin}</span>
+          </div>
+      `;
+      openGroup = true;
+    }
+
+    html += `<div class="msg-bubble${isOwn ? ' own' : ''}">${esc(m.payload.text)}</div>`;
+  });
+
+  if (openGroup) html += '</div>';
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateSyncBar() {
+  const peerCount = Object.keys(peers).length;
+  document.getElementById('sync-status').textContent =
+    `dag: ${dag.getAll().length} events · ${peerCount} peer${peerCount !== 1 ? 's' : ''} · bc active`;
+}
+
+function updateP2PUI() {
+  const peerCount = Object.keys(peers).length;
+  const openPeers = Object.values(peers).filter(p => p.dc && p.dc.readyState === 'open');
+  const connected = openPeers.length;
+
+  const dot   = document.getElementById('p2p-dot');
+  const label = document.getElementById('p2p-label');
+  const count = document.getElementById('peer-count');
+
+  dot.className = 'p2p-dot ' + (connected > 0 ? 'connected' : peerCount > 0 ? 'connecting' : '');
+  label.textContent = connected > 0 ? `${connected} peer${connected !== 1 ? 's' : ''} connected` : 'P2P offline';
+  count.textContent = `${connected} peer${connected !== 1 ? 's' : ''}`;
+
+  // Peer list
+  const list = document.getElementById('peer-list');
+  if (Object.keys(peers).length === 0) {
+    list.innerHTML = '<p style="font-size:11px;color:var(--text-tertiary)">No peers connected</p>';
+  } else {
+    list.innerHTML = Object.entries(peers).map(([id, p]) => `
+      <div class="peer-item">
+        <span class="peer-status-dot" style="background:${p.dc && p.dc.readyState === 'open' ? 'var(--success)' : 'var(--warn)'}"></span>
+        <span class="peer-name">${esc(p.name)}</span>
+        <span class="peer-events">${p.eventsReceived || 0} ev</span>
+        <button class="peer-disconnect" onclick="disconnectPeer('${id}')">&#215;</button>
+      </div>
+    `).join('');
+  }
+
+  updateSyncBar();
+}
+
+function disconnectPeer(peerId) {
+  const peer = peers[peerId];
+  if (!peer) return;
+  try { peer.dc && peer.dc.close(); peer.pc && peer.pc.close(); } catch(e) {}
+  delete peers[peerId];
+  updateP2PUI();
+  p2pLog('warn', `Disconnected peer: ${peer.name}`);
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  ACTIONS
+// ════════════════════════════════════════════════════════════
+function openChannel(id, name, type) {
+  activeChannel = id;
+  unread[id]    = 0;
+  const hdr = document.getElementById('chat-header');
+  hdr.style.display = 'flex';
+  document.getElementById('chat-title').textContent =
+    (type === 'dm' ? '@ ' : '# ') + name;
+  renderAll();
+  document.getElementById('msg-input').focus();
+}
+
+function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text  = input.value.trim();
+  if (!text || !activeChannel) return;
+
+  const ev = createEvent('message', {
+    channel: activeChannel, text, author: currentUser
+  }, currentUser);
+
+  ev._origin = 'local';
+  dispatchEvent(ev);
+  input.value = '';
+  input.style.height = 'auto';
+  renderAll();
+}
+
+function handleIncoming(ev, originLabel) {
+  // Tag event with origin for display
+  ev._origin = originLabel || 'p2p';
+  if (ev.type === 'message' && ev.payload.channel !== activeChannel) {
+    unread[ev.payload.channel] = (unread[ev.payload.channel] || 0) + 1;
+  }
+}
+
+function createChannel(name, type) {
+  const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  if (!slug) return;
+  const id = 'ch_' + slug + '_' + Date.now();
+  const ev = createEvent('create_channel', { id, name: slug, type }, currentUser);
+  dispatchEvent(ev);
+  renderAll();
+  openChannel(id, slug, type);
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  P2P LOG
+// ════════════════════════════════════════════════════════════
+function p2pLog(level, msg) {
+  const log = document.getElementById('p2p-log');
+  const line = document.createElement('div');
+  line.className = `log-line ${level}`;
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  line.textContent = `[${t}] ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+  // Keep log trim
+  while (log.children.length > 60) log.removeChild(log.firstChild);
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function hashStr(s) {
+  let h = 0;
+  for (let i=0; i<s.length; i++) h = (h<<5)-h+s.charCodeAt(i);
+  return Math.abs(h);
+}
+
+function getColor(uid) {
+  if (!colorCache[uid]) {
+    const i = hashStr(uid) % AV_COLORS.length;
+    colorCache[uid] = { color: AV_COLORS[i], bg: AV_BGS[i] };
+  }
+  return colorCache[uid];
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════════
+function showModal(title, bodyHtml, confirmText) {
+  return new Promise(resolve => {
+    modalResolve = resolve;
+    document.getElementById('modal-title').textContent  = title;
+    document.getElementById('modal-body').innerHTML     = bodyHtml;
+    document.getElementById('modal-confirm').textContent = confirmText || 'confirm';
+    document.getElementById('modal-overlay').classList.add('open');
+  });
+}
+
+function closeModal(val) {
+  document.getElementById('modal-overlay').classList.remove('open');
+  if (modalResolve) { modalResolve(val); modalResolve = null; }
+}
+
+document.getElementById('modal-cancel').onclick  = () => closeModal(null);
+document.getElementById('modal-confirm').onclick = () => {
+  const inputs = document.querySelectorAll('#modal-body input, #modal-body select');
+  closeModal(Array.from(inputs).map(i => i.value.trim()));
+};
+document.getElementById('modal-overlay').onclick = (e) => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal(null);
+};
+
+
+// ════════════════════════════════════════════════════════════
+//  EVENT LISTENERS
+// ════════════════════════════════════════════════════════════
+document.getElementById('send-btn').onclick = sendMessage;
+
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 90) + 'px';
+});
+
+document.getElementById('new-ch-btn').onclick = async () => {
+  const vals = await showModal(
+    'New channel',
+    `<input id="ch-name" placeholder="channel-name">
+     <select id="ch-type">
+       <option value="group">Group channel (#)</option>
+       <option value="dm">Direct message</option>
+     </select>`,
+    'create'
+  );
+  if (!vals || !vals[0]) return;
+  createChannel(vals[0], vals[1]);
+};
+
+document.getElementById('change-user').onclick = async () => {
+  const opts = USERS.map(u =>
+    `<option value="${u.id}"${u.id===currentUser?' selected':''}>${u.name}</option>`
+  ).join('');
+  const vals = await showModal('Switch user', `<select>${opts}</select>`, 'switch');
+  if (!vals) return;
+  currentUser = vals[0];
+  localStorage.setItem(USER_KEY, currentUser);
+  renderUserRow();
+  renderMessages();
+};
+
+// P2P panel toggle
+document.getElementById('p2p-pill').onclick = () => {
+  document.getElementById('p2p-panel').classList.toggle('open');
+};
+document.getElementById('p2p-close').onclick = () => {
+  document.getElementById('p2p-panel').classList.remove('open');
+};
+
+// P2P controls
+document.getElementById('create-offer-btn').onclick  = createOffer;
+document.getElementById('accept-answer-btn').onclick = acceptAnswer;
+document.getElementById('accept-offer-btn').onclick  = acceptOffer;
+document.getElementById('sync-dag-btn').onclick      = p2pSyncAll;
+
+document.getElementById('copy-offer-btn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('offer-output').value)
+    .then(() => p2pLog('ok', 'Offer copied to clipboard'));
+};
+
+document.getElementById('copy-answer-btn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('answer-output').value)
+    .then(() => p2pLog('ok', 'Answer copied to clipboard'));
+};
+
+
+// ════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ════════════════════════════════════════════════════════════
+function ensureSeedChannels() {
+  const existing = new Set(dag.getChannels().map(c => c.id));
+  SEED_CHANNELS.forEach(ch => {
+    if (!existing.has(ch.id)) {
+      const ev = { id: makeEventId('system'), type:'create_channel', payload:ch, author:'system', timestamp:Date.now() };
+      dag.append(ev);
+    }
+  });
+  saveDAG(dag);
+}
+
+function init() {
+  loadDAG(dag);
+  seedSeen(dag);
+  ensureSeedChannels();
+
+  const saved = localStorage.getItem(USER_KEY);
+  currentUser = USERS.find(u => u.id === saved) ? saved : USERS[0].id;
+  localStorage.setItem(USER_KEY, currentUser);
+
+  renderUserRow();
+  renderChannelList();
+  updateP2PUI();
+  p2pLog('info', 'DLDSS Messenger P2P v1.1 initialized');
+  p2pLog('info', `DAG loaded: ${dag.getAll().length} events`);
+}
+
+init();
+</script>
+</body>
+</html>
